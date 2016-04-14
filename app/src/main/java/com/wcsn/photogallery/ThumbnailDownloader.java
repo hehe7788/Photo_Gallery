@@ -21,7 +21,6 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
     private static final String TAG = "ThumbnailDownloader";
     private static final int MESSAGE_DOWNLOAD = 0;
     private static final int BITMAP_CACHE = 20;
-    private static final String CACHE_TOKEN = "imageView";
 
     Handler mHandler;
     Map<Token,String> requestMap = Collections.synchronizedMap(new HashMap<Token, String>());
@@ -55,7 +54,7 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
      * @param url
      */
     public void queueThumbnail(Token token, String url) {
-        Log.e(TAG, "Got an URL : " + url);
+        //Log.e(TAG, "Got an URL : " + url);
         requestMap.put(token, url);
         //以MESSAGE_DOWNLOAD为what，Token为obj从消息池中获取一条消息，
         // 并把该消息发送出去放到消息队列中
@@ -77,7 +76,7 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
                 if (msg.what == MESSAGE_DOWNLOAD) {
                     @SuppressWarnings("unchecked")
                     Token token = (Token) msg.obj;
-                    Log.e(TAG, "Got a request for url: " + requestMap.get(token));
+                    //Log.e(TAG, "Got a request for url: " + requestMap.get(token));
                     //下载
                     handleRequest(token);
                 }
@@ -97,11 +96,22 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
             if (url == null) {
                 return;
             }
-            //传递url给FlickrFetchr新实例
-            byte[] bitmapBytes = new FlickrFetchr().getUrlBytes(url);
-            //使用BitmapFactory将字节数组转换为位图
-            final Bitmap bitmap = BitmapFactory.decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
-            Log.e(TAG, "Bitmap create");
+
+            byte[] bitmapBytes;
+            final Bitmap bitmap;
+
+            if (mLruCache.get(url) == null) {
+                //缓存中没有此图片
+                //传递url给FlickrFetchr新实例
+                bitmapBytes = new FlickrFetchr().getUrlBytes(url);
+                //使用BitmapFactory将字节数组转换为位图
+                bitmap = BitmapFactory.decodeByteArray(bitmapBytes, 0, bitmapBytes.length);
+                Log.e(TAG, "Bitmap create");
+            } else {
+                //缓存中有此图片
+                bitmap = mLruCache.get(url);
+                Log.e(TAG, "Bitmap from cache");
+            }
 
             mResponseHandler.post(new Runnable() {
                 @Override
@@ -111,6 +121,8 @@ public class ThumbnailDownloader<Token> extends HandlerThread {
                     }
                     requestMap.remove(token);
                     mListener.onThumbnailDownloader(token, bitmap);
+                    //加入缓存
+                    mLruCache.put(url, bitmap);
                 }
             });
         } catch (IOException e) {

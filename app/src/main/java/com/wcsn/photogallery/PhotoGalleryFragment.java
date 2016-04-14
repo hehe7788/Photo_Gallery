@@ -59,6 +59,7 @@ public class PhotoGalleryFragment extends Fragment {
 
         mGridView = (GridView) v.findViewById(R.id.gridView);
         setupAdapter();
+
         return v;
     }
     private class FetchItemTask extends AsyncTask<Void, Void, ArrayList<GalleryItem>> {
@@ -103,8 +104,13 @@ public class PhotoGalleryFragment extends Fragment {
             ImageView imageView = (ImageView) convertView.findViewById(R.id.gallery_item_imageView);
             imageView.setImageResource(R.drawable.bill_up_close);
             GalleryItem item = getItem(position);
+            int prePostion, postPostion;
+            //todo 预加载
+
             mThumbnailDownloader.queueThumbnail(imageView, item.getUrl());
 
+            //获取可见单元格数
+            //Log.e(TAG, "getChildCount:" + mGridView.getChildCount() + "  getLastVisiblePosition: " + mGridView.getLastVisiblePosition());
             return convertView;
         }
     }
