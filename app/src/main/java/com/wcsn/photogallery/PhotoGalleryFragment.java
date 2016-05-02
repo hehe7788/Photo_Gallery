@@ -1,18 +1,30 @@
 package com.wcsn.photogallery;
 
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.SearchManager;
+import android.app.SearchableInfo;
+import android.content.ComponentName;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.GridView;
 import android.widget.ImageView;
+import android.widget.SearchView;
 
 import java.util.ArrayList;
 
@@ -31,7 +43,9 @@ public class PhotoGalleryFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
-        new FetchItemTask().execute();
+        setHasOptionsMenu(true);
+
+        updateItems();
 
         //Handler在哪个线程里new出来 它就属于哪个线程 这个匿名Handler属于主线程
         mThumbnailDownloader = new ThumbnailDownloader<>(new Handler());
@@ -52,6 +66,9 @@ public class PhotoGalleryFragment extends Fragment {
         Log.e(TAG, "Background thread started");
     }
 
+    public void updateItems() {
+            new FetchItemsTask().execute();
+    }
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -62,15 +79,59 @@ public class PhotoGalleryFragment extends Fragment {
 
         return v;
     }
-    private class FetchItemTask extends AsyncTask<Void, Void, ArrayList<GalleryItem>> {
-        @Override
-        protected void onProgressUpdate(Void... values) {
-            super.onProgressUpdate(values);
-        }
 
+    @Override
+    @TargetApi(11)
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.fragment_photo_gallery, menu);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            // pull out the SearchView
+            MenuItem searchItem = menu.findItem(R.id.menu_item_search);
+            SearchView searchView = (SearchView)searchItem.getActionView();
+
+            // get the data from our searchable.xml as a SearchableInfo
+            SearchManager searchManager = (SearchManager)getActivity()
+                .getSystemService(Context.SEARCH_SERVICE);
+            ComponentName name = getActivity().getComponentName();
+            SearchableInfo searchInfo = searchManager.getSearchableInfo(name);
+
+            searchView.setSearchableInfo(searchInfo);
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_item_search:
+                getActivity().onSearchRequested();
+                return true;
+            case R.id.menu_item_clear:
+                PreferenceManager.getDefaultSharedPreferences(getActivity())
+                    .edit()
+                    .putString(FlickrFetchr.PREF_SEARCH_QUERY, null)
+                    .commit();
+                updateItems();
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
+    }
+
+    private class FetchItemsTask extends AsyncTask<Void,Void,ArrayList<GalleryItem>> {
         @Override
         protected ArrayList<GalleryItem> doInBackground(Void... params) {
-            return new FlickrFetchr().fetchItems();
+            Activity activity = getActivity();
+            if (activity == null)
+                return new ArrayList<GalleryItem>();
+
+            String query = PreferenceManager.getDefaultSharedPreferences(activity)
+                .getString(FlickrFetchr.PREF_SEARCH_QUERY, null);
+            if (query != null) {
+                return new FlickrFetchr().search(query);
+            } else {
+                return new FlickrFetchr().fetchItems();
+            }
         }
 
         @Override
@@ -90,28 +151,41 @@ public class PhotoGalleryFragment extends Fragment {
 
     private class GalleryItemAdapter extends ArrayAdapter<GalleryItem> {
         public GalleryItemAdapter(ArrayList<GalleryItem> items) {
-            super(getActivity(),0, items);
+            super(getActivity(), 0, items);
         }
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
+            ViewHolder viewHolder;
             if (convertView == null) {
                 convertView = getActivity().getLayoutInflater()
                         .inflate(R.layout.gallery_item, parent, false);
+
+                viewHolder = new ViewHolder();
+                viewHolder.mImageView = (ImageView) convertView.findViewById(R.id.gallery_item_imageView);
+
+                convertView.setTag(viewHolder);
+            } else {
+                viewHolder = (ViewHolder) convertView.getTag();
             }
 
             //显示初始占位图片
-            ImageView imageView = (ImageView) convertView.findViewById(R.id.gallery_item_imageView);
-            imageView.setImageResource(R.drawable.bill_up_close);
+            viewHolder.mImageView.setImageResource(R.drawable.bill_up_close);
+
+
             GalleryItem item = getItem(position);
             int prePostion, postPostion;
             //todo 预加载
 
-            mThumbnailDownloader.queueThumbnail(imageView, item.getUrl());
+            mThumbnailDownloader.queueThumbnail(viewHolder.mImageView, item.getUrl());
 
             //获取可见单元格数
             //Log.e(TAG, "getChildCount:" + mGridView.getChildCount() + "  getLastVisiblePosition: " + mGridView.getLastVisiblePosition());
             return convertView;
+        }
+
+        private class ViewHolder {
+            ImageView mImageView;
         }
     }
 
