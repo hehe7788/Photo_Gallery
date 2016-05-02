@@ -24,12 +24,14 @@ public class PhotoGalleryActivity extends SingleFragmentActivity {
             String query = intent.getStringExtra(SearchManager.QUERY);
             Log.i(TAG, "Received a new search query: " + query);
 
+            //存储查询信息
             PreferenceManager.getDefaultSharedPreferences(this)
                     .edit()
                     .putString(FlickrFetchr.PREF_SEARCH_QUERY, query)
                     .commit();
-        }
 
-        fragment.updateItems();
+            //刷新图片项
+            fragment.updateItems();
+        }
     }
 }

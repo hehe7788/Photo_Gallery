@@ -32,6 +32,7 @@ public class FlickrFetchr {
 
     private static final String XML_PHOTO = "photo";
     public static final String PREF_SEARCH_QUERY = "searchQuery";
+    public static final String PREF_LAST_RESULT_ID = "lastResultId";
 
     //从指定url获取字节数组
     byte[] getUrlBytes(String urlSpec) throws IOException {
@@ -65,6 +66,7 @@ public class FlickrFetchr {
                 .appendQueryParameter("api_key", API_KEY)
                 .appendQueryParameter(PARAM_EXTRAS, EXTRA_SMALL_URL)
                 .build().toString();
+        Log.e(TAG, "fetchItems:" + url);
         return downloadGalleryItems(url);
     }
 
@@ -93,6 +95,7 @@ public class FlickrFetchr {
                 .appendQueryParameter(PARAM_EXTRAS, EXTRA_SMALL_URL)
                 .appendQueryParameter(PARAM_TEXT, query)
                 .build().toString();
+        Log.e(TAG, "search:" + url);
         return downloadGalleryItems(url);
     }
 

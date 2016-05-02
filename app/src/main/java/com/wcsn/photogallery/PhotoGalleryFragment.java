@@ -6,6 +6,7 @@ import android.app.SearchManager;
 import android.app.SearchableInfo;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -47,6 +48,9 @@ public class PhotoGalleryFragment extends Fragment {
 
         updateItems();
 
+        //启动服务
+        //PollService.setServiceAlarm(getActivity(), true);
+
         //Handler在哪个线程里new出来 它就属于哪个线程 这个匿名Handler属于主线程
         mThumbnailDownloader = new ThumbnailDownloader<>(new Handler());
         mThumbnailDownloader.setListener(new ThumbnailDownloader.Listener<ImageView>(){
@@ -67,7 +71,8 @@ public class PhotoGalleryFragment extends Fragment {
     }
 
     public void updateItems() {
-            new FetchItemsTask().execute();
+        Log.e(TAG, "updateItems");
+        new FetchItemsTask().execute();
     }
     @Nullable
     @Override
@@ -99,6 +104,17 @@ public class PhotoGalleryFragment extends Fragment {
             searchView.setSearchableInfo(searchInfo);
         }
     }
+    @Override
+    public void onPrepareOptionsMenu(Menu menu) {
+        super.onPrepareOptionsMenu(menu);
+
+        MenuItem toggleItem = menu.findItem(R.id.menu_item_toggle_polling);
+        if (PollService.isServiceAlarmOn(getActivity())) {
+            toggleItem.setTitle(R.string.stop_polling);
+        } else {
+            toggleItem.setTitle(R.string.start_polling);
+        }
+    }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -113,6 +129,14 @@ public class PhotoGalleryFragment extends Fragment {
                     .commit();
                 updateItems();
                 return true;
+            case R.id.menu_item_toggle_polling:
+                boolean shouldStartAlarm = !PollService.isServiceAlarmOn(getActivity());
+                PollService.setServiceAlarm(getActivity(), shouldStartAlarm);
+
+                //invalidateOptionsMenu回调onPrepareOptionsMenu更新操作栏
+                getActivity().invalidateOptionsMenu();
+
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -121,6 +145,7 @@ public class PhotoGalleryFragment extends Fragment {
     private class FetchItemsTask extends AsyncTask<Void,Void,ArrayList<GalleryItem>> {
         @Override
         protected ArrayList<GalleryItem> doInBackground(Void... params) {
+            Log.e(TAG, "AsyncTask doInBackground");
             Activity activity = getActivity();
             if (activity == null)
                 return new ArrayList<GalleryItem>();
@@ -136,6 +161,8 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         protected void onPostExecute(ArrayList<GalleryItem> items) {
+            Log.e(TAG, "AsyncTask onPostExecute");
+
             mItems = items;
             setupAdapter();
         }
